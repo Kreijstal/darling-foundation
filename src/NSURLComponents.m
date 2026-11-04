@@ -354,4 +354,14 @@ static NSRange rangeFromCF(CFRange range)
     [super dealloc];
 }
 
+- (NSString *)encodedHost
+{
+    return [self percentEncodedHost];
+}
+
+- (void)setEncodedHost:(NSString *)host
+{
+    [self setPercentEncodedHost:host];
+}
+
 @end

@@ -32,6 +32,7 @@
 @property(nullable, copy) NSString *percentEncodedUser;
 @property(nullable, copy) NSString *percentEncodedPassword;
 @property(nullable, copy) NSString *percentEncodedHost;
+@property(nullable, copy) NSString *encodedHost;
 @property(nullable, copy) NSString *percentEncodedPath;
 @property(nullable, copy) NSString *percentEncodedQuery;
 @property(nullable, copy) NSString *percentEncodedFragment;
