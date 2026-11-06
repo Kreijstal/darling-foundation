@@ -287,7 +287,7 @@ SINGLETON_RR()
 {
     unsigned long long amt = 1;
     size_t len = sizeof(unsigned long long);
-    if (sysctlbyname("hw.physmem", &amt, &len, 0, 0) != 0)
+    if (sysctlbyname("hw.memsize", &amt, &len, 0, 0) != 0)
     {
         amt = 1;
     }
@@ -389,8 +389,21 @@ static NSInteger _suddenTerminationCount = 0;
 
 @end
 
-// Nothing in Darling terminates an idle app, so both calls only have to exist.
+// Nothing in Darling terminates an idle app, so the calls only have to exist and the flag round-trips.
+// NSProcessInfo is a process-wide singleton, so the flag lives in a static instead of a new ivar.
+static BOOL _automaticTerminationSupportEnabled;
+
 @implementation NSProcessInfo (NSProcessInfoAutomaticTermination)
+
+- (BOOL)automaticTerminationSupportEnabled
+{
+    return _automaticTerminationSupportEnabled;
+}
+
+- (void)setAutomaticTerminationSupportEnabled: (BOOL) enabled
+{
+    _automaticTerminationSupportEnabled = enabled;
+}
 
 - (void)disableAutomaticTermination: (NSString *) reason
 {
