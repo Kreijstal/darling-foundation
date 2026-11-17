@@ -11,6 +11,7 @@
 
 #import <Foundation/NSDictionary.h>
 #import <Foundation/NSInvocation.h>
+#import <Foundation/NSMethodSignature.h>
 #import <Foundation/NSKeyedArchiver.h>
 #import <Foundation/NSOrderedSet.h>
 
