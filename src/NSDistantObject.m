@@ -534,7 +534,7 @@ static NSInvocation *makeInvocation(NSDistantObject *self, SEL _cmd) {
 }
 
 - (void) forwardInvocation: (NSInvocation *) invocation {
-    NSDOLog(@"%s proxy with id %d, selector %s", typeString(_type), _id, sel_getName([invocation selector]));
+    NSDOLog(@"%s proxy with id %d, invocation %@", typeString(_type), _id, invocation);
 
     switch (_type) {
     case NSDistantObjectTypeLocalProxy:
@@ -599,7 +599,14 @@ static NSInvocation *makeInvocation(NSDistantObject *self, SEL _cmd) {
 }
 
 - (NSString *) description {
-    return [NSString stringWithFormat: @"<NSDistantObject: %p id=%d type=%s>", self, _id, typeString(_type)];
+    NSString *retVal = nil;
+    NSInvocation *inv = nil;
+    id builder = _NSMessageBuilder(self, &inv);
+    [builder description];
+    object_dispose(builder);
+    [self forwardInvocation: inv];
+    [inv getReturnValue: &retVal];
+    return retVal;
 }
 
 - (id) copy {

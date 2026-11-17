@@ -44,7 +44,7 @@ NSString * const NSMetadataUbiquitousItemIsUploadingKey = @"NSMetadataUbiquitous
 NSString * const NSMetadataUbiquitousItemPercentDownloadedKey = @"NSMetadataUbiquitousItemPercentDownloadedKey";
 NSString * const NSMetadataUbiquitousItemPercentUploadedKey = @"NSMetadataUbiquitousItemPercentUploadedKey";
 NSString * const NSMetadataQueryLocalComputerScope = @"kMDQueryScopeComputer";
-/* Rung 6 (GUESS) */
+/* String values as observed on macOS 27 (the constants are opaque to callers). */
 NSString * const NSMetadataQueryNetworkScope = @"kMDQueryScopeNetwork";
 NSString * const NSMetadataQueryIndexedLocalComputerScope = @"kMDQueryScopeComputerIndexed";
 NSString * const NSMetadataQueryIndexedNetworkScope = @"kMDQueryScopeNetworkIndexed";

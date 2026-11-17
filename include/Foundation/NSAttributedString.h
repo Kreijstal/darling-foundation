@@ -17,7 +17,7 @@ typedef NS_OPTIONS(NSUInteger, NSAttributedStringFormattingOptions) {
 
 @class NSLocale;
 
-@interface NSAttributedString : NSObject <NSCopying, NSMutableCopying, NSCoding>
+@interface NSAttributedString : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 
 - (NSDictionary<NSAttributedStringKey, id> * _Nonnull)attributesAtIndex:(NSUInteger)index effectiveRange:(NSRangePointer)range;
 
@@ -84,12 +84,6 @@ FOUNDATION_EXPORT const NSAttributedStringKey NSReplacementIndexAttributeName NS
 
 @end
 
-@interface NSMutableAttributedString (NSMutableAttributedStringFormatting)
-
-- (void)appendLocalizedFormat:(NSAttributedString *)format, ...;
-
-@end
-
 typedef NS_OPTIONS(NSUInteger, NSInlinePresentationIntent) {
     NSInlinePresentationIntentEmphasized         = 1 << 0,
     NSInlinePresentationIntentStronglyEmphasized = 1 << 1,
@@ -105,3 +99,9 @@ typedef NS_OPTIONS(NSUInteger, NSInlinePresentationIntent) {
 FOUNDATION_EXPORT const NSAttributedStringKey NSInlinePresentationIntentAttributeName NS_SWIFT_NAME(inlinePresentationIntent);
 // Value: an NSString holding a BCP-47 language identifier.
 FOUNDATION_EXPORT const NSAttributedStringKey NSLanguageIdentifierAttributeName NS_SWIFT_NAME(languageIdentifier);
+
+@interface NSMutableAttributedString (NSMutableAttributedStringFormatting)
+
+- (void)appendLocalizedFormat:(NSAttributedString *)format, ...;
+
+@end

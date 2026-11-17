@@ -228,11 +228,14 @@ static inline void addIndexesInRange(NSIndexSet *self, NSRange range)
         }
         else if (NSContainsRange(ptr->range, range))
         {
+            free(newRange);
             return;
         }
         else
         {
-            DL_INSERT(MULTIPLE_RANGE_DATA(self), ptr, newRange);
+            // DL_INSERT puts the new node in front of the given one; the new range follows ptr.
+            RangeList *following = ptr->next;
+            DL_INSERT(MULTIPLE_RANGE_DATA(self), following, newRange);
         }
         
         [self _mergeOverlappingRangesStartingAtIndex:(ptr ?: MULTIPLE_RANGE_DATA(self))];
@@ -379,6 +382,50 @@ static inline CFComparisonResult NSIndexSetCompareEntry(RangeList *r1, RangeList
     return self;
 }
 
++ (BOOL)supportsSecureCoding
+{
+    return YES;
+}
+
+// Sets with two or more ranges archive them as one data blob: every range is a
+// (location, length) pair of unsigned base-128 varints, lowest group first.
+static void appendIndexSetVarint(NSMutableData *data, NSUInteger value)
+{
+    do
+    {
+        uint8_t byte = value & 0x7f;
+        value >>= 7;
+        if (value != 0)
+        {
+            byte |= 0x80;
+        }
+        [data appendBytes:&byte length:1];
+    } while (value != 0);
+}
+
+static BOOL readIndexSetVarint(const uint8_t *bytes, NSUInteger length, NSUInteger *position, NSUInteger *value)
+{
+    NSUInteger result = 0;
+    const unsigned bits = sizeof(NSUInteger) * 8;
+    unsigned shift = 0;
+    while (*position < length)
+    {
+        uint8_t byte = bytes[(*position)++];
+        if (shift >= bits || (shift + 7 > bits && ((byte & 0x7f) >> (bits - shift)) != 0))
+        {
+            return NO;
+        }
+        result |= (NSUInteger)(byte & 0x7f) << shift;
+        if ((byte & 0x80) == 0)
+        {
+            *value = result;
+            return YES;
+        }
+        shift += 7;
+    }
+    return NO;
+}
+
 - (void) encodeWithCoder: (NSCoder*)aCoder
 {
     if ([aCoder allowsKeyedCoding])
@@ -392,12 +439,12 @@ static inline CFComparisonResult NSIndexSetCompareEntry(RangeList *r1, RangeList
         }
         else if (count > 1)
         {
-            NSMutableData *data = [[NSMutableData alloc] init];
+            NSMutableData *data = [NSMutableData data];
             RangeList *ptr = NULL;
             DL_FOREACH(MULTIPLE_RANGE_DATA(self), ptr)
             {
-                [data appendBytes:&ptr->range.location length:sizeof(NSUInteger)];
-                [data appendBytes:&ptr->range.length length:sizeof(NSUInteger)];
+                appendIndexSetVarint(data, ptr->range.location);
+                appendIndexSetVarint(data, ptr->range.length);
             }
             [aCoder encodeObject:data forKey:@"NSRangeData"];
         }
@@ -411,34 +458,59 @@ static inline CFComparisonResult NSIndexSetCompareEntry(RangeList *r1, RangeList
 - (id)initWithCoder:(NSCoder *)coder {
     if ([coder allowsKeyedCoding])
     {
-        NSUInteger count = [coder decodeInt64ForKey:@"NSRangeCount"];
+        int64_t count = [coder decodeInt64ForKey:@"NSRangeCount"];
         if (count == 1)
         {
-            NSRange range = NSMakeRange([coder decodeInt64ForKey:@"NSLocation"], [coder decodeInt64ForKey:@"NSLength"]);
-            return [self initWithIndexesInRange:range];
+            int64_t location = [coder decodeInt64ForKey:@"NSLocation"];
+            int64_t length = [coder decodeInt64ForKey:@"NSLength"];
+            if (location < 0 || length < 0 || (uint64_t)location + (uint64_t)length < (uint64_t)location)
+            {
+                [self release];
+                return nil;
+            }
+            return [self initWithIndexesInRange:NSMakeRange((NSUInteger)location, (NSUInteger)length)];
         }
         else if (count > 1)
         {
+            NSData *data = [coder decodeObjectOfClass:[NSData class] forKey:@"NSRangeData"];
+            const uint8_t *bytes = [data bytes];
+            NSUInteger dataLength = [data length];
+            // Each range takes at least two bytes.
+            if (data == nil || (uint64_t)count > dataLength / 2)
+            {
+                [self release];
+                return nil;
+            }
             [self _init];
             if (self)
             {
-                NSData *data = [coder decodeObjectForKey:@"NSRangeData"];
-                // increase the by two since ranges always come in pair
-                for (int i = 1; i <= count; i = i+2)
+                NSUInteger position = 0;
+                for (int64_t i = 0; i < count; i++)
                 {
-                    NSUInteger location;
-                    [data getBytes:&location length:sizeof(NSUInteger)];
-                    NSUInteger length;
-                    [data getBytes:&length length:sizeof(NSUInteger)];
+                    NSUInteger location, length;
+                    if (!readIndexSetVarint(bytes, dataLength, &position, &location) ||
+                        !readIndexSetVarint(bytes, dataLength, &position, &length) ||
+                        location + length < location)
+                    {
+                        [self release];
+                        return nil;
+                    }
                     addIndexesInRange(self, NSMakeRange(location, length));
-                }  
+                }
+                if (position != dataLength)
+                {
+                    [self release];
+                    return nil;
+                }
             }
             return self;
         }
-        else
+        else if (count == 0)
         {
             return [self init];
         }
+        [self release];
+        return nil;
     }
     else 
     {
@@ -529,16 +601,16 @@ static inline CFComparisonResult NSIndexSetCompareEntry(RangeList *r1, RangeList
     }
 }
 
+// This method is not part of the public NSIndexSet interface, so it is deliberately absent from NSIndexSet.h.
+// QUIRK: an index that is not smaller than -rangeCount raises NSInvalidArgumentException. Undocumented; evidence:
+// black-box observation on macOS 27 (tier 2, probe vd-upstream/mac-probes/v215-rangeatindex.m): an empty set, a
+// single-range set and a multi-range set (for NSNotFound) all raise that exception for such an index.
+// Test: nsindexset-rangeatindex.m (test_quirk_range_at_index_out_of_bounds_raises)
 - (NSRange) rangeAtIndex: (NSUInteger) idx
 {
     if (idx >= [self rangeCount])
     {
-        return NSMakeRange(NSNotFound, 0);
-    }
-
-    if (IS_EMPTY(self))
-    {
-        return NSMakeRange(NSNotFound, 0);
+        [NSException raise:NSInvalidArgumentException format:@"range index %lu is out of bounds", (unsigned long) idx];
     }
 
     if (HAS_SINGLE_RANGE(self))

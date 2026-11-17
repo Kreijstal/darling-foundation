@@ -1,7 +1,6 @@
 #import <Foundation/NSObject.h>
 #import <Foundation/NSDate.h>
 #import <Foundation/NSDictionary.h>
-#import <Foundation/NSNotification.h>
 
 enum {
     NSWindowsNTOperatingSystem = 1,
@@ -57,7 +56,6 @@ typedef NS_ENUM(NSInteger, NSProcessInfoThermalState) {
 - (NSTimeInterval)systemUptime;
 - (NSOperatingSystemVersion)operatingSystemVersion;
 - (BOOL)isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion)version;
-@property (readonly, getter=isLowPowerModeEnabled) BOOL lowPowerModeEnabled;
 @property (readonly) NSProcessInfoThermalState thermalState;
 
 @end

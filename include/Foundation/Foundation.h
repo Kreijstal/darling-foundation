@@ -3,6 +3,7 @@
 #import <Foundation/NSObjCRuntime.h>
 #import <Foundation/NSArray.h>
 #import <Foundation/NSAutoreleasePool.h>
+#import <Foundation/NSBackgroundActivityScheduler.h>
 #import <Foundation/NSBundle.h>
 #import <Foundation/NSByteOrder.h>
 #import <Foundation/NSCalendar.h>
@@ -38,6 +39,7 @@
 #import <Foundation/NSLocale.h>
 #import <Foundation/NSLock.h>
 #import <Foundation/NSMapTable.h>
+#import <Foundation/NSMeasurement.h>
 #import <Foundation/NSMeasurementFormatter.h>
 #import <Foundation/NSMethodSignature.h>
 #import <Foundation/NSNotification.h>
@@ -80,6 +82,7 @@
 #import <Foundation/NSURLProtocol.h>
 #import <Foundation/NSURLRequest.h>
 #import <Foundation/NSURLResponse.h>
+#import <Foundation/NSUnit.h>
 #import <Foundation/NSUserDefaults.h>
 #import <Foundation/NSValue.h>
 #import <Foundation/NSValueTransformer.h>

@@ -1,12 +1,18 @@
 #import <Foundation/NSObject.h>
 
-@class NSString, NSData, NSSet;
+@class NSString, NSData, NSSet<__covariant ObjectType>;
+
+typedef NS_ENUM(NSInteger, NSDecodingFailurePolicy) {
+    NSDecodingFailurePolicyRaiseException,
+    NSDecodingFailurePolicySetErrorAndReturn,
+} API_AVAILABLE(macos(10.13), ios(11.0), watchos(4.0), tvos(11.0));
 
 @interface NSCoder : NSObject
 
 - (void)encodeValueOfObjCType:(const char *)type at:(const void *)addr;
 - (void)encodeDataObject:(NSData *)data;
 - (void)decodeValueOfObjCType:(const char *)type at:(void *)data;
+- (void)decodeValueOfObjCType:(const char *)type at:(void *)data size:(NSUInteger)size API_AVAILABLE(macos(10.13), ios(11.0), watchos(4.0), tvos(11.0));
 - (NSData *)decodeDataObject;
 - (NSInteger)versionForClassName:(NSString *)className;
 
@@ -52,8 +58,16 @@
 - (NSInteger)decodeIntegerForKey:(NSString *)key;
 @property (readonly) BOOL requiresSecureCoding;
 - (id)decodeObjectOfClass:(Class)aClass forKey:(NSString *)key;
-- (id)decodeObjectOfClasses:(NSSet *)classes forKey:(NSString *)key;
+- (nullable id)decodeObjectOfClasses:(nullable NSSet<Class> *)classes forKey:(NSString *)key;
 - (id)decodePropertyListForKey:(NSString *)key;
-- (NSSet *)allowedClasses;
+@property (nullable, readonly, copy) NSSet<Class> *allowedClasses API_AVAILABLE(macos(10.8), ios(6.0), watchos(2.0), tvos(9.0));
+- (id)decodeTopLevelObjectAndReturnError:(NSError **)error NS_SWIFT_UNAVAILABLE("Use 'decodeTopLevelObject() throws' instead");
+- (id)decodeTopLevelObjectForKey:(NSString *)key error:(NSError **)error NS_SWIFT_UNAVAILABLE("Use 'decodeObject(of:, forKey:)' instead");
+- (id)decodeTopLevelObjectOfClass:(Class)aClass forKey:(NSString *)key error:(NSError **)error NS_SWIFT_UNAVAILABLE("Use 'decodeObject(of:, forKey:)' instead");
+- (id)decodeTopLevelObjectOfClasses:(NSSet<Class> *)classes forKey:(NSString *)key error:(NSError **)error NS_SWIFT_UNAVAILABLE("Use 'decodeObject(of:, forKey:)' instead");
+- (NSArray *)decodeArrayOfObjectsOfClass:(Class)cls forKey:(NSString *)key NS_REFINED_FOR_SWIFT;
+- (NSArray *)decodeArrayOfObjectsOfClasses:(NSSet<Class> *)classes forKey:(NSString *)key NS_REFINED_FOR_SWIFT;
+- (NSDictionary *)decodeDictionaryWithKeysOfClass:(Class)keyCls objectsOfClass:(Class)objectCls forKey:(NSString *)key NS_REFINED_FOR_SWIFT;
+- (NSDictionary *)decodeDictionaryWithKeysOfClasses:(NSSet<Class> *)keyClasses objectsOfClasses:(NSSet<Class> *)objectClasses forKey:(NSString *)key NS_REFINED_FOR_SWIFT;
 
 @end

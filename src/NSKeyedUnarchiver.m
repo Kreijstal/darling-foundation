@@ -34,6 +34,8 @@ NSString *const NSInvalidUnarchiveOperationException = @"NSInvalidUnarchiveOpera
     NSArray *_white;
     NSUInteger _lastRef;
     NSMutableArray *_allowedClasses;
+    NSError *_error;
+    BOOL _setsErrorOnFailure;
 }
 - (BOOL)classNameAllowed:(Class)class;
 - (void)setAllowedClassNames:(NSArray *)classNames;
@@ -51,6 +53,7 @@ NSString *const NSInvalidUnarchiveOperationException = @"NSInvalidUnarchiveOpera
         [_white release];
     }
     [_allowedClasses release];
+    [_error release];
 
     [super dealloc];
 }
@@ -255,6 +258,9 @@ static BOOL _decodeBool(NSKeyedUnarchiver *unarchiver, NSString *key)
         {
             return NO;
         }
+        // QUIRK: decodeBoolForKey: accepts an integer-typed value (non-zero is YES). Not documented.
+        // Reason: nib archives store booleans as integers. Applies to the binary and XML readers.
+        // Test: tests/keyed-archive-decode.m (test_quirk_decode_bool_from_integer)
         if (CFGetTypeID(val) == CFNumberGetTypeID() && !CFNumberIsFloatType((CFNumberRef)val))
         {
             int64_t intVal = 0;
@@ -283,6 +289,7 @@ static BOOL _decodeBool(NSKeyedUnarchiver *unarchiver, NSString *key)
     {
         return NO;
     }
+    // QUIRK: integer-typed value accepted as a bool, see the XML branch above.
     if (encodedVal >= kCFBinaryPlistMarkerInt && encodedVal <= (kCFBinaryPlistMarkerInt | 3))
     {
         uint8_t *ptr = (uint8_t *)(unarchiver->_bytes + voffset);
@@ -332,7 +339,10 @@ static double _decodeDouble(NSKeyedUnarchiver *unarchiver, NSString *key)
         memmove(&swapped32, ptr + 1, 4);
         return (double)CFConvertFloat32SwappedToHost(swapped32);
     }
-    // Archives from other encoders (e.g. nibs) store integral values such as NSPriority as integers.
+    // QUIRK: decodeDoubleForKey:/decodeFloatForKey: accept an integer-typed value and convert it.
+    // Not documented. Reason: archives written by other encoders (nib files) store integral
+    // values such as priorities as integers; the integer is converted as is.
+    // Test: tests/keyed-archive-decode.m (test_quirk_decode_double_from_integer)
     if (*ptr >= kCFBinaryPlistMarkerInt && *ptr <= (kCFBinaryPlistMarkerInt | 3))
     {
         return (double)_getInt(&ptr);
@@ -458,6 +468,32 @@ static BOOL _classIsAllowed(Class class, NSSet *allowedClasses)
     return NO;
 }
 
+// Values archived as plain property-list scalars (strings, numbers, booleans,
+// data) carry no class name, so they are checked as the instance of their
+// class that they decode to. `owned` says the caller holds a +1 reference that
+// has to be dropped when the value is refused.
+static id _scalarAllowed(NSKeyedUnarchiver *unarchiver, id value, BOOL owned)
+{
+    if (value == nil || ![unarchiver requiresSecureCoding])
+    {
+        return value;
+    }
+    NSSet *allowedClassSet = [unarchiver allowedClasses];
+    if (_classIsAllowed([value class], allowedClassSet))
+    {
+        return value;
+    }
+    NSString *className = NSStringFromClass([value class]);
+    if (owned)
+    {
+        CFRelease(value);
+    }
+    [[NSException exceptionWithName:NSInvalidUnarchiveOperationException
+                            reason:[NSString stringWithFormat:@"%@ was unexpected. The expected classes are %@", className, allowedClassSet]
+                          userInfo: @{@"__NSCoderInternalErrorCode" : @4864}] raise];
+    return nil;
+}
+
 static id _decodeObjectBinary(NSKeyedUnarchiver *unarchiver, NSUInteger uid1) NS_RETURNS_RETAINED
 {
     uint64_t voffset = unarchiver->_offsetData->valueOffset;
@@ -486,11 +522,11 @@ static id _decodeObjectBinary(NSKeyedUnarchiver *unarchiver, NSUInteger uid1) NS
         }
         else if (marker == kCFBinaryPlistMarkerTrue)
         {
-            return (id)kCFBooleanTrue;
+            return _scalarAllowed(unarchiver, (id)kCFBooleanTrue, NO);
         }
         else if (marker == kCFBinaryPlistMarkerFalse)
         {
-            return (id)kCFBooleanFalse;
+            return _scalarAllowed(unarchiver, (id)kCFBooleanFalse, NO);
         }
         else if (markerTag == kCFBinaryPlistMarkerASCIIString)
         {
@@ -504,7 +540,7 @@ static id _decodeObjectBinary(NSKeyedUnarchiver *unarchiver, NSUInteger uid1) NS
             {
                 return nil; // This is a success. nil is the correctly decoded value here.
             }
-            return string;
+            return _scalarAllowed(unarchiver, (id)string, YES);
         }
         else if (markerTag == kCFBinaryPlistMarkerInt || markerTag == kCFBinaryPlistMarkerReal || markerTag == kCFBinaryPlistMarkerData || markerTag == kCFBinaryPlistMarkerUnicode16String)
         {
@@ -513,7 +549,7 @@ static id _decodeObjectBinary(NSKeyedUnarchiver *unarchiver, NSUInteger uid1) NS
             {
                 return nil;
             }
-            return obj;
+            return _scalarAllowed(unarchiver, (id)obj, YES);
         }
         else if (markerTag != kCFBinaryPlistMarkerDict)
         {
@@ -678,7 +714,7 @@ static id _decodeObjectXML(NSKeyedUnarchiver *unarchiver, NSString *key)
     }
     if (typeID == CFStringGetTypeID() || typeID == CFNumberGetTypeID() || typeID == CFBooleanGetTypeID() || typeID == CFDataGetTypeID())
     {
-        return [obj retain];
+        return _scalarAllowed(unarchiver, [obj retain], YES);
     }
 
     CFKeyedArchiverUIDRef keyedArchiverUID;
@@ -1089,8 +1125,75 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
 
 - (id)initForReadingFromData:(NSData *)data error:(NSError **)error
 {
-#warning TODO [NSKeyedUnarchiver initForReadingFromData:error:]
-    return [self initForReadingWithData: data];
+    if (error != NULL)
+    {
+        *error = nil;
+    }
+    id unarchiver = nil;
+    @try
+    {
+        unarchiver = [self initForReadingWithData: data];
+    }
+    @catch (NSException *exception)
+    {
+        unarchiver = nil;
+    }
+    if (unarchiver == nil)
+    {
+        if (error != NULL)
+        {
+            *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSCoderReadCorruptError userInfo:@{NSLocalizedDescriptionKey: @"The data isn't in the correct format."}];
+        }
+        return nil;
+    }
+    // This initializer reports decoding failures through -error, not by raising.
+    [(NSKeyedUnarchiver *)unarchiver setDecodingFailurePolicy:NSDecodingFailurePolicySetErrorAndReturn];
+    return unarchiver;
+}
+
+- (NSDecodingFailurePolicy)decodingFailurePolicy
+{
+    return _helper->_setsErrorOnFailure ? NSDecodingFailurePolicySetErrorAndReturn : NSDecodingFailurePolicyRaiseException;
+}
+
+- (void)setDecodingFailurePolicy:(NSDecodingFailurePolicy)policy
+{
+    _helper->_setsErrorOnFailure = (policy == NSDecodingFailurePolicySetErrorAndReturn);
+}
+
+- (BOOL)_recordDecodeFailure:(NSException *)exception
+{
+    if (![[exception name] isEqualToString:NSInvalidUnarchiveOperationException])
+    {
+        return NO;
+    }
+    // QUIRK: with the set-error-and-return failure policy (the default of
+    // -initForReadingFromData:error:) a refused class or malformed value does not
+    // raise: the decode returns nil (or zero for scalar decodes) and -error holds a
+    // read-corrupt error (code 4864). This applies to binary and XML property list
+    // archives alike. Not documented in detail. Evidence: black-box observation on
+    // macOS 26.7.3 (tier 2), MC26.13.
+    // Test: test_quirk_set_error_policy_returns_nil in tests/secure-coding-conformance.m
+    NSError *failure = [NSError errorWithDomain:NSCocoaErrorDomain code:NSCoderReadCorruptError userInfo:@{NSLocalizedDescriptionKey: @"The data couldn't be read because it isn't in the correct format.", NSDebugDescriptionErrorKey: [exception reason] ?: @""}];
+    _helper->_error = [failure retain];
+    return YES;
+}
+
+- (NSError *)error
+{
+    return _helper->_error;
+}
+
+- (void)failWithError:(NSError *)error
+{
+    if (_helper->_error == nil)
+    {
+        _helper->_error = [error retain];
+    }
+    if (!_helper->_setsErrorOnFailure)
+    {
+        [NSException raise:NSInvalidUnarchiveOperationException format:@"%@", [error localizedDescription]];
+    }
 }
 
 - (id)init
@@ -1403,7 +1506,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
     {
         return NULL;
     }
-    return _decodeBytes(self, key, len);
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return _decodeBytes(self, key, len);
+    }
+    if (_helper->_error != nil)
+    {
+        return NULL;
+    }
+    @try
+    {
+        return _decodeBytes(self, key, len);
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return NULL;
+    }
 }
 
 - (double)decodeDoubleForKey:(NSString *)key
@@ -1415,7 +1537,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
         return 0.0;
     }
 
-    return _decodeDouble(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return _decodeDouble(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return 0.0;
+    }
+    @try
+    {
+        return _decodeDouble(self, unescapeKey(key));
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return 0.0;
+    }
 }
 
 - (float)decodeFloatForKey:(NSString *)key
@@ -1427,7 +1568,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
         return 0.0f;
     }
 
-    return (float)_decodeDouble(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return (float)_decodeDouble(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return 0.0f;
+    }
+    @try
+    {
+        return (float)_decodeDouble(self, unescapeKey(key));
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return 0.0f;
+    }
 }
 
 - (long long)decodeInt64ForKey:(NSString *)key
@@ -1439,7 +1599,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
         return 0ll;
     }
 
-    return (long long)_decodeInt(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return (long long)_decodeInt(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return 0ll;
+    }
+    @try
+    {
+        return (long long)_decodeInt(self, unescapeKey(key));
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return 0ll;
+    }
 }
 
 - (int)decodeInt32ForKey:(NSString *)key
@@ -1451,7 +1630,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
         return 0;
     }
 
-    return (int)_decodeInt(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return (int)_decodeInt(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return 0;
+    }
+    @try
+    {
+        return (int)_decodeInt(self, unescapeKey(key));
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return 0;
+    }
 }
 
 - (int)decodeIntForKey:(NSString *)key
@@ -1463,7 +1661,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
         return 0;
     }
 
-    return _decodeInt(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return _decodeInt(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return 0;
+    }
+    @try
+    {
+        return _decodeInt(self, unescapeKey(key));
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return 0;
+    }
 }
 
 - (BOOL)decodeBoolForKey:(NSString *)key
@@ -1475,7 +1692,26 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
         return NO;
     }
 
-    return _decodeBool(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return _decodeBool(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return NO;
+    }
+    @try
+    {
+        return _decodeBool(self, unescapeKey(key));
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return NO;
+    }
 }
 
 - (NSArray *)_decodeArrayOfObjectsForKey:(NSString *)key
@@ -1654,7 +1890,7 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
     return (_flags & NSSecureCodingFlag) != 0;
 }
 
-- (NSSet *)allowedClasses
+- (NSSet<Class> *)allowedClasses
 {
     if ([self requiresSecureCoding])
     {
@@ -1666,7 +1902,7 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
     }
 }
 
-- (id)decodeObjectOfClasses:(NSSet *)classes forKey:(NSString *)key
+- (id)decodeObjectOfClasses:(NSSet<Class> *)classes forKey:(NSString *)key
 {
     if ([self requiresSecureCoding])
     {
@@ -1711,7 +1947,29 @@ static CFDictionaryValueCallBacks sNSCFDictionaryValueCallBacks = {
 {
     _flags |= NSKeyedArchivingStarted;
 
-    return _decodeObject(self, unescapeKey(key));
+    if (!_helper->_setsErrorOnFailure)
+    {
+        return _decodeObject(self, unescapeKey(key));
+    }
+    if (_helper->_error != nil)
+    {
+        return nil; // after a failure every decode returns nil
+    }
+    @try
+    {
+        id object = _decodeObject(self, unescapeKey(key));
+        // A refused member decoded inside this object's initializer returned nil and recorded the
+        // failure; the object built around it is not handed out.
+        return _helper->_error != nil ? nil : object;
+    }
+    @catch (NSException *exception)
+    {
+        if (![self _recordDecodeFailure:exception])
+        {
+            @throw;
+        }
+        return nil;
+    }
 }
 
 - (BOOL)containsValueForKey:(NSString *)key
@@ -1845,7 +2103,7 @@ static NSError *unarchivingError(NSInteger code, NSString *description)
         *error = nil;
     if (data == nil || [classes count] == 0) {
         if (error)
-            *error = unarchivingError(4864 /* NSCoderReadCorruptError */, @"The data isn't in the correct format.");
+            *error = unarchivingError(NSCoderReadCorruptError, @"The data isn't in the correct format.");
         return nil;
     }
 
@@ -1857,6 +2115,12 @@ static NSError *unarchivingError(NSInteger code, NSString *description)
     NSKeyedUnarchiver *unarchiver = nil;
     @try {
         unarchiver = [[NSKeyedUnarchiver alloc] initForReadingWithData: data];
+        if (unarchiver == nil) {
+            // Data that is not a keyed archive is corrupt, not merely lacking a root object.
+            if (error)
+                *error = unarchivingError(NSCoderReadCorruptError, @"The data isn't in the correct format.");
+            return nil;
+        }
         [unarchiver setRequiresSecureCoding: YES];
         object = [[unarchiver decodeObjectOfClasses: decodableClasses forKey: NSKeyedArchiveRootObjectKey] retain];
         [unarchiver finishDecoding];
@@ -1864,13 +2128,13 @@ static NSError *unarchivingError(NSInteger code, NSString *description)
         [object release];
         object = nil;
         if (error)
-            *error = unarchivingError(4864 /* NSCoderReadCorruptError */, [exception reason] ?: @"The data couldn't be read because it isn't in the correct format.");
+            *error = unarchivingError(NSCoderReadCorruptError, [exception reason] ?: @"The data couldn't be read because it isn't in the correct format.");
     }
     [unarchiver release];
 
     if (object == nil) {
         if (error && *error == nil)
-            *error = unarchivingError(4865 /* NSCoderValueNotFoundError */, @"The data doesn't contain a root object.");
+            *error = unarchivingError(NSCoderValueNotFoundError, @"The data doesn't contain a root object.");
         return nil;
     }
 
@@ -1883,7 +2147,7 @@ static NSError *unarchivingError(NSInteger code, NSString *description)
     }
     if (!allowed) {
         if (error)
-            *error = unarchivingError(4864 /* NSCoderReadCorruptError */, [NSString stringWithFormat: @"The root object's class %@ isn't one of the allowed classes.", [object class]]);
+            *error = unarchivingError(NSCoderReadCorruptError, [NSString stringWithFormat: @"The root object's class %@ isn't one of the allowed classes.", [object class]]);
         [object release];
         return nil;
     }

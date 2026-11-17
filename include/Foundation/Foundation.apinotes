@@ -102,6 +102,10 @@ Classes:
 # that expects Data accepts it.
 - Name: NSData
   SwiftBridge: Foundation.Data
+# Pass the Swift URLRequest value type to NSURLRequest-taking APIs such as
+# URLSession.dataTask(with:completionHandler:) through its Objective-C bridge.
+- Name: NSURLRequest
+  SwiftBridge: Foundation.URLRequest
 # The overlay's value types, as in the macOS SDK. Without these, `NSDate *`, `NSURL *`, ... in an
 # Objective-C signature import as the classes and Swift callers passing Date, URL, ... fail to type-check.
 - Name: NSDate
@@ -118,10 +122,6 @@ Classes:
   SwiftBridge: Foundation.URL
 - Name: NSCharacterSet
   SwiftBridge: Foundation.CharacterSet
-# Pass the Swift URLRequest value type to NSURLRequest-taking APIs such as
-# URLSession.dataTask(with:completionHandler:) through its Objective-C bridge.
-- Name: NSURLRequest
-  SwiftBridge: Foundation.URLRequest
 # SwiftName renames an Objective-C class to the name Swift code written against a recent macOS SDK
 # spells it. The class is unchanged; only the Swift-facing name is added. Without these the Swift
 # spelling does not resolve at all, and the diagnostic ("cannot find type 'RunLoop' in scope")
@@ -207,23 +207,63 @@ Classes:
     SwiftName: "localizedString(from:dateStyle:timeStyle:)"
 - Name: NSDateComponentsFormatter
   SwiftName: DateComponentsFormatter
-  Methods:
-  # macOS's string(from:); NSTimeInterval does not import as TimeInterval, so the importer keeps fromTimeInterval.
-  - Selector: "stringFromTimeInterval:"
-    MethodKind: Instance
-    SwiftName: "string(from:)"
-- Name: NSDateIntervalFormatter
-  SwiftName: DateIntervalFormatter
 - Name: NSISO8601DateFormatter
   SwiftName: ISO8601DateFormatter
 - Name: NSMeasurementFormatter
   SwiftName: MeasurementFormatter
-- Name: NSLengthFormatter
-  SwiftName: LengthFormatter
-- Name: NSMassFormatter
-  SwiftName: MassFormatter
-- Name: NSEnergyFormatter
-  SwiftName: EnergyFormatter
+# As on macOS: the NSUnit family imports without the NS prefix (Unit, Dimension, UnitConverter, UnitLength, ...).
+- Name: NSUnit
+  SwiftName: Unit
+- Name: NSDimension
+  SwiftName: Dimension
+- Name: NSUnitConverter
+  SwiftName: UnitConverter
+- Name: NSUnitConverterLinear
+  SwiftName: UnitConverterLinear
+- Name: NSUnitAcceleration
+  SwiftName: UnitAcceleration
+- Name: NSUnitAngle
+  SwiftName: UnitAngle
+- Name: NSUnitArea
+  SwiftName: UnitArea
+- Name: NSUnitConcentrationMass
+  SwiftName: UnitConcentrationMass
+- Name: NSUnitDispersion
+  SwiftName: UnitDispersion
+- Name: NSUnitDuration
+  SwiftName: UnitDuration
+- Name: NSUnitElectricCharge
+  SwiftName: UnitElectricCharge
+- Name: NSUnitElectricCurrent
+  SwiftName: UnitElectricCurrent
+- Name: NSUnitElectricPotentialDifference
+  SwiftName: UnitElectricPotentialDifference
+- Name: NSUnitElectricResistance
+  SwiftName: UnitElectricResistance
+- Name: NSUnitEnergy
+  SwiftName: UnitEnergy
+- Name: NSUnitFrequency
+  SwiftName: UnitFrequency
+- Name: NSUnitFuelEfficiency
+  SwiftName: UnitFuelEfficiency
+- Name: NSUnitIlluminance
+  SwiftName: UnitIlluminance
+- Name: NSUnitInformationStorage
+  SwiftName: UnitInformationStorage
+- Name: NSUnitLength
+  SwiftName: UnitLength
+- Name: NSUnitMass
+  SwiftName: UnitMass
+- Name: NSUnitPower
+  SwiftName: UnitPower
+- Name: NSUnitPressure
+  SwiftName: UnitPressure
+- Name: NSUnitSpeed
+  SwiftName: UnitSpeed
+- Name: NSUnitTemperature
+  SwiftName: UnitTemperature
+- Name: NSUnitVolume
+  SwiftName: UnitVolume
 - Name: NSJSONSerialization
   SwiftName: JSONSerialization
 - Name: NSPropertyListSerialization
@@ -238,18 +278,27 @@ Classes:
   - Selector: "propertyList:isValidForFormat:"
     MethodKind: Class
     SwiftName: "propertyList(_:isValidFor:)"
-- Name: NSProgress
-  SwiftName: Progress
-  Methods:
-  - Selector: 'discreteProgressWithTotalUnitCount:'
-    MethodKind: Class
-    SwiftName: 'discreteProgress(totalUnitCount:)'
 Typedefs:
 # Like the macOS SDK (NS_TYPED_EXTENSIBLE_ENUM): NSURLResourceKey imports as the struct URLResourceKey, which Swift
 # mangles as `So16NSURLResourceKeya`.
 - Name: NSURLResourceKey
   SwiftWrapper: struct
   SwiftName: URLResourceKey
+- Name: NSURLFileResourceType
+  SwiftWrapper: struct
+  SwiftName: URLFileResourceType
+- Name: NSURLThumbnailDictionaryItem
+  SwiftWrapper: struct
+  SwiftName: URLThumbnailDictionaryItem
+- Name: NSURLUbiquitousItemDownloadingStatus
+  SwiftWrapper: struct
+  SwiftName: URLUbiquitousItemDownloadingStatus
+- Name: NSURLUbiquitousSharedItemRole
+  SwiftWrapper: struct
+  SwiftName: URLUbiquitousSharedItemRole
+- Name: NSURLUbiquitousSharedItemPermissions
+  SwiftWrapper: struct
+  SwiftName: URLUbiquitousSharedItemPermissions
 # The importer does not infer nesting from NS_TYPED_EXTENSIBLE_ENUM or NS_ENUM, so without the
 # four entries below the macOS spellings NSAttributedString.Key, NSCalendar.Unit,
 # NumberFormatter.Style and RunLoop.Mode do not resolve at all.
@@ -264,47 +313,23 @@ Typedefs:
   SwiftName: PropertyListSerialization.ReadOptions
 - Name: NSPropertyListWriteOptions
   SwiftName: PropertyListSerialization.WriteOptions
-- Name: NSProgressKind
-  SwiftName: ProgressKind
-- Name: NSProgressUserInfoKey
-  SwiftName: ProgressUserInfoKey
-- Name: NSProgressFileOperationKind
-  SwiftName: Progress.FileOperationKind
 Tags:
 - Name: NSRoundingMode
   SwiftName: NSDecimalNumber.RoundingMode
-- Name: NSProcessInfoThermalState
-  SwiftName: ProcessInfo.ThermalState
 - Name: NSCalculationError
   SwiftName: NSDecimalNumber.CalculationError
-- Name: NSFormattingUnitStyle
-  SwiftName: Formatter.UnitStyle
-- Name: NSLengthFormatterUnit
-  SwiftName: LengthFormatter.Unit
-- Name: NSMassFormatterUnit
-  SwiftName: MassFormatter.Unit
-- Name: NSEnergyFormatterUnit
-  SwiftName: EnergyFormatter.Unit
-- Name: NSMeasurementFormatterUnitOptions
-  SwiftName: MeasurementFormatter.UnitOptions
 - Name: NSCalendarUnit
   SwiftName: NSCalendar.Unit
 - Name: NSNumberFormatterStyle
   SwiftName: NumberFormatter.Style
-- Name: NSDateFormatterStyle
-  SwiftName: DateFormatter.Style
-- Name: NSDateFormatterBehavior
-  SwiftName: DateFormatter.Behavior
-- Name: NSDateComponentsFormatterUnitsStyle
-  SwiftName: DateComponentsFormatter.UnitsStyle
-- Name: NSDateComponentsFormatterZeroFormattingBehavior
-  SwiftName: DateComponentsFormatter.ZeroFormattingBehavior
 - Name: NSPropertyListFormat
   SwiftName: PropertyListSerialization.PropertyListFormat
 - Name: NSPropertyListMutabilityOptions
   SwiftName: PropertyListSerialization.MutabilityOptions
-- Name: NSISO8601DateFormatOptions
-  SwiftName: ISO8601DateFormatter.Options
+- Name: NSDateFormatterStyle
+  SwiftName: DateFormatter.Style
+- Name: NSDateFormatterBehavior
+  SwiftName: DateFormatter.Behavior
 Enumerators:
 # Nesting an enum does not re-derive its cases: the importer strips the common NSNumberFormatter
 # prefix but not the trailing Style, leaving .decimalStyle rather than macOS's .decimal.
@@ -339,20 +364,6 @@ Enumerators:
   SwiftName: overflow
 - Name: NSCalculationDivideByZero
   SwiftName: divideByZero
-- Name: NSDateFormatterNoStyle
-  SwiftName: none
-- Name: NSDateFormatterShortStyle
-  SwiftName: short
-- Name: NSDateFormatterMediumStyle
-  SwiftName: medium
-- Name: NSDateFormatterLongStyle
-  SwiftName: long
-- Name: NSDateFormatterFullStyle
-  SwiftName: full
-- Name: NSDateFormatterBehaviorDefault
-  SwiftName: default
-- Name: NSDateFormatterBehavior10_4
-  SwiftName: behavior10_4
 - Name: NSPropertyListOpenStepFormat
   SwiftName: openStep
 - Name: NSPropertyListXMLFormat_v1_0
@@ -379,10 +390,22 @@ Enumerators:
   SwiftName: forcedOrdering
 - Name: NSRegularExpressionSearch
   SwiftName: regularExpression
+- Name: NSDateFormatterNoStyle
+  SwiftName: none
+- Name: NSDateFormatterShortStyle
+  SwiftName: short
+- Name: NSDateFormatterMediumStyle
+  SwiftName: medium
+- Name: NSDateFormatterLongStyle
+  SwiftName: long
+- Name: NSDateFormatterFullStyle
+  SwiftName: full
+- Name: NSDateFormatterBehaviorDefault
+  SwiftName: default
+- Name: NSDateFormatterBehavior10_4
+  SwiftName: behavior10_4
 Globals:
 - Name: NSDefaultRunLoopMode
   SwiftName: RunLoop.Mode.default
 - Name: NSRunLoopCommonModes
   SwiftName: RunLoop.Mode.common
-- Name: NSProcessInfoThermalStateDidChangeNotification
-  SwiftName: ProcessInfo.thermalStateDidChangeNotification

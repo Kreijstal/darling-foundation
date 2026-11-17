@@ -80,6 +80,8 @@ typedef struct __CFNumberFormatter* CFNumberFormatterRef;
 - (void)setThousandSeparator:(NSString *)string;
 - (BOOL)hasThousandSeparators;
 - (void)setHasThousandSeparators:(BOOL)b;
+- (BOOL)localizesFormat;
+- (void)setLocalizesFormat:(BOOL)flag;
 - (NSString *)zeroSymbol;
 - (void)setZeroSymbol:(NSString *)string;
 - (NSDictionary *)textAttributesForZero;

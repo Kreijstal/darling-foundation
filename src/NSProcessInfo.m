@@ -353,15 +353,10 @@ SINGLETON_RR()
 	}
 }
 
-- (BOOL)isLowPowerModeEnabled
-{
-	return NO;
-}
-
 - (NSProcessInfoThermalState)thermalState
 {
-	/* No thermal-pressure source on Linux; report Nominal so clients
-	 * (e.g. Chromium's ThermalStateObserverMac) proceed normally. */
+	/* There is no thermal-pressure source on Linux; report Nominal, so
+	 * NSProcessInfoThermalStateDidChangeNotification is never posted. */
 	return NSProcessInfoThermalStateNominal;
 }
 

@@ -18,6 +18,9 @@
 #import <CoreFoundation/CFURL.h>
 #import <objc/runtime.h>
 
+// The key string is the constant's own name, like the other NSURL keys.
+NSURLThumbnailDictionaryItem const NSThumbnail1024x1024SizeKey = @"NSThumbnail1024x1024SizeKey";
+
 // Private classes
 @interface NSURLFileTypeMappings : NSObject
 @end
@@ -88,23 +91,62 @@ OBJC_PROTOCOL_IMPL_PUSH
 
     return self;
 }
+OBJC_PROTOCOL_IMPL_POP
 
 - (id)initFileURLWithPath:(NSString *)path isDirectory:(BOOL)isDir relativeToURL:(NSURL *)baseURL
 {
-    if (baseURL == nil || [path isAbsolutePath])
-    {
-        return [self initFileURLWithPath:path isDirectory:isDir];
-    }
-    if ([path length] == 0)
+    if (path == nil)
     {
         [self release];
+        [NSException raise:NSInvalidArgumentException format:@"path cannot be nil"];
         return nil;
     }
-    [self release];
-    self = (NSURL*) CFURLCreateWithFileSystemPathRelativeToBase(kCFAllocatorDefault, (CFStringRef)path, kCFURLPOSIXPathStyle, isDir, (CFURLRef)baseURL);
+
+    CFURLRef url = CFURLCreateWithFileSystemPathRelativeToBase(kCFAllocatorDefault, (CFStringRef)path, kCFURLPOSIXPathStyle, isDir, (CFURLRef)baseURL);
+
+    if ([self class] == [NSURL class])
+    {
+        [self release];
+        return (NSURL *)url;
+    }
+
+    self = [super init];
+    if (self)
+    {
+        _reserved = (void *)url;
+    }
+    else if (url)
+    {
+        CFRelease(url);
+    }
     return self;
 }
-OBJC_PROTOCOL_IMPL_POP
+
+- (id)initFileURLWithPath:(NSString *)path relativeToURL:(NSURL *)baseURL
+{
+    if (path == nil)
+    {
+        [self release];
+        [NSException raise:NSInvalidArgumentException format:@"path cannot be nil"];
+        return nil;
+    }
+
+    // Whether the path names a directory is decided by the file system, after
+    // resolving a relative path against the base URL (not the current directory).
+    NSString *fullPath = path;
+    if (![path isAbsolutePath] && baseURL != nil)
+    {
+        NSString *basePath = [baseURL path];
+        if (basePath != nil)
+        {
+            fullPath = [basePath stringByAppendingPathComponent:path];
+        }
+    }
+
+    BOOL isDir = NO;
+    [[NSFileManager defaultManager] fileExistsAtPath:fullPath isDirectory:&isDir];
+    return [self initFileURLWithPath:path isDirectory:isDir relativeToURL:baseURL];
+}
 
 - (id)initFileURLWithFileSystemRepresentation:(const char *)path isDirectory:(BOOL)isDir relativeToURL:(NSURL *)baseURL
 {
@@ -148,14 +190,19 @@ OBJC_PROTOCOL_IMPL_PUSH
     return [[[self alloc] initFileURLWithPath:path isDirectory:isDir] autorelease];
 }
 
++ (id)fileURLWithPath:(NSString *)path
+{
+    return [[[self alloc] initFileURLWithPath:path] autorelease];
+}
+
 + (id)fileURLWithPath:(NSString *)path isDirectory:(BOOL)isDir relativeToURL:(NSURL *)baseURL
 {
     return [[[self alloc] initFileURLWithPath:path isDirectory:isDir relativeToURL:baseURL] autorelease];
 }
 
-+ (id)fileURLWithPath:(NSString *)path
++ (id)fileURLWithPath:(NSString *)path relativeToURL:(NSURL *)baseURL
 {
-    return [[[self alloc] initFileURLWithPath:path] autorelease];
+    return [[[self alloc] initFileURLWithPath:path relativeToURL:baseURL] autorelease];
 }
 
 + (id)URLWithString:(NSString *)str relativeToURL:(NSURL *)url
@@ -368,8 +415,8 @@ OBJC_PROTOCOL_IMPL_PUSH
     NSString *relative = nil;
     if ([coder allowsKeyedCoding])
     {
-        base = [coder decodeObjectForKey:@"NS.base"];
-        relative = [coder decodeObjectForKey:@"NS.relative"];
+        base = [coder decodeObjectOfClass:[NSURL class] forKey:@"NS.base"];
+        relative = [coder decodeObjectOfClass:[NSString class] forKey:@"NS.relative"];
     }
     else
     {
@@ -613,6 +660,74 @@ OBJC_PROTOCOL_IMPL_PUSH
 }
 OBJC_PROTOCOL_IMPL_POP
 
+OBJC_PROTOCOL_IMPL_PUSH
+- (id)initWithDataRepresentation:(NSData *)data relativeToURL:(NSURL *)url
+{
+    return [self _initWithDataRepresentation:data relativeToURL:url absolute:NO];
+}
+
+- (id)initAbsoluteURLWithDataRepresentation:(NSData *)data relativeToURL:(NSURL *)url
+{
+    return [self _initWithDataRepresentation:data relativeToURL:url absolute:YES];
+}
+OBJC_PROTOCOL_IMPL_POP
+
+// The data is the URL string in UTF-8. The absolute form resolves it against the base
+// and keeps no base URL.
+- (id)_initWithDataRepresentation:(NSData *)data relativeToURL:(NSURL *)url absolute:(BOOL)absolute
+{
+    CFURLRef created = NULL;
+    if (data != nil)
+    {
+        CFURLRef base = url != nil ? [url _cfurl] : NULL;
+        if (absolute)
+        {
+            created = CFURLCreateAbsoluteURLWithBytes(kCFAllocatorDefault, (const UInt8 *)[data bytes], [data length], kCFStringEncodingUTF8, base, false);
+        }
+        else
+        {
+            created = CFURLCreateWithBytes(kCFAllocatorDefault, (const UInt8 *)[data bytes], [data length], kCFStringEncodingUTF8, base);
+        }
+    }
+    if ([self class] == [NSURL class])
+    {
+        [self release];
+        return (NSURL *)created;
+    }
+    if (created == NULL)
+    {
+        [self release];
+        return nil;
+    }
+    self = [super init];
+    if (self)
+    {
+        _reserved = (void *)created;
+    }
+    else
+    {
+        CFRelease(created);
+    }
+    return self;
+}
+
+OBJC_PROTOCOL_IMPL_PUSH
++ (id)URLWithDataRepresentation:(NSData *)data relativeToURL:(NSURL *)url
+{
+    return [[[self alloc] initWithDataRepresentation:data relativeToURL:url] autorelease];
+}
+
++ (id)absoluteURLWithDataRepresentation:(NSData *)data relativeToURL:(NSURL *)url
+{
+    return [[[self alloc] initAbsoluteURLWithDataRepresentation:data relativeToURL:url] autorelease];
+}
+OBJC_PROTOCOL_IMPL_POP
+
+- (NSData *)dataRepresentation
+{
+    return [(NSData *)CFURLCreateData(kCFAllocatorDefault, [self _cfurl], kCFStringEncodingUTF8, NO) autorelease];
+}
+
 // What is this for?
 #if 0
 - (id)_initWithMinimalBookmarkData:(id)minimalBookmarkData
@@ -660,15 +775,6 @@ OBJC_PROTOCOL_IMPL_POP
 - (NSURL *)URLByAppendingPathComponent:(NSString *)pathComponent isDirectory:(BOOL)isDirectory
 {
     return [(NSURL *)CFURLCreateCopyAppendingPathComponent(CFGetAllocator(self), (CFURLRef)self, (CFStringRef) pathComponent, isDirectory) autorelease];
-}
-
-- (BOOL)startAccessingSecurityScopedResource
-{
-    return YES;
-}
-
-- (void)stopAccessingSecurityScopedResource
-{
 }
 
 @end

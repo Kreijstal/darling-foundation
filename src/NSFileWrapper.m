@@ -173,6 +173,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 	return nil;
 }
 
+- (NSURL*) symbolicLinkDestinationURL
+{
+	return [NSURL fileURLWithPath: [self symbolicLinkDestination]];
+}
+
 
 // Init and return an instance for a regular file type
 - (id) initRegularFileWithContents: (NSData*) data
@@ -190,6 +195,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - (id) initSymbolicLinkWithDestination: (NSString*) path
 {
 	return [[NSFileWrapperLink alloc] initSymbolicLinkWithDestination: path];
+}
+
+- (id) initSymbolicLinkWithDestinationURL: (NSURL*) url
+{
+	return [self initSymbolicLinkWithDestination: [url path]];
 }
 
 - (NSString *)filename

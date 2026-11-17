@@ -25,6 +25,11 @@
     return [NSDate self];
 }
 
++ (NSDate *)now
+{
+    return [NSDate date];
+}
+
 OBJC_PROTOCOL_IMPL_PUSH
 - (id)initWithCoder:(NSCoder *)aDecoder
 {

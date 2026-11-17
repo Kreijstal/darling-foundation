@@ -23,7 +23,7 @@ typedef NS_ENUM(NSUInteger, NSURLRequestNetworkServiceType) {
 
 @class NSURLRequestInternal;
 
-@interface NSURLRequest : NSObject <NSCoding, NSCopying, NSMutableCopying>
+@interface NSURLRequest : NSObject <NSSecureCoding, NSCopying, NSMutableCopying>
 {
     NSURLRequestInternal *_internal;
 }
@@ -37,7 +37,9 @@ typedef NS_ENUM(NSUInteger, NSURLRequestNetworkServiceType) {
 - (NSTimeInterval)timeoutInterval;
 - (NSURL *)mainDocumentURL;
 - (NSURLRequestNetworkServiceType)networkServiceType;
-- (BOOL)allowsCellularAccess;
+@property (readonly) BOOL allowsCellularAccess;
+@property (readonly) BOOL allowsExpensiveNetworkAccess;
+@property (readonly) BOOL allowsConstrainedNetworkAccess;
 
 @end
 
@@ -48,7 +50,9 @@ typedef NS_ENUM(NSUInteger, NSURLRequestNetworkServiceType) {
 - (void)setTimeoutInterval:(NSTimeInterval)seconds;
 - (void)setMainDocumentURL:(NSURL *)URL;
 - (void)setNetworkServiceType:(NSURLRequestNetworkServiceType)networkServiceType;
-- (void)setAllowsCellularAccess:(BOOL)allow;
+@property BOOL allowsCellularAccess;
+@property BOOL allowsExpensiveNetworkAccess;
+@property BOOL allowsConstrainedNetworkAccess;
 
 @end
 

@@ -8,7 +8,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface NSURLResponse : NSObject <NSCoding, NSCopying>
+@interface NSURLResponse : NSObject <NSSecureCoding, NSCopying>
 {
     NSURLResponseInternal *_internal;
 }

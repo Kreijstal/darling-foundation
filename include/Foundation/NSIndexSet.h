@@ -4,7 +4,7 @@
 typedef struct RangeList RangeList;
 typedef struct NSIndexSetCache NSIndexSetCache;
 
-@interface NSIndexSet : NSObject <NSCopying, NSMutableCopying, NSCoding>
+@interface NSIndexSet : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 {
 @package
     struct {
@@ -36,7 +36,6 @@ typedef struct NSIndexSetCache NSIndexSetCache;
 - (NSUInteger)count;
 - (NSUInteger)firstIndex;
 - (NSUInteger)lastIndex;
-- (NSRange)rangeAtIndex: (NSUInteger)idx;
 - (NSUInteger)indexGreaterThanIndex:(NSUInteger)value;
 - (NSUInteger)indexLessThanIndex:(NSUInteger)value;
 - (NSUInteger)indexGreaterThanOrEqualToIndex:(NSUInteger)value;

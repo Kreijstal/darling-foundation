@@ -214,7 +214,7 @@ FOUNDATION_EXPORT const NSExceptionName NSAssertionHandlerKey;
 FOUNDATION_EXPORT void NSRequestConcreteImplementation(id self, SEL _cmd, Class abstractClass);
 
 __attribute__((__objc_exception__))
-@interface NSException : NSObject <NSCopying, NSCoding> {
+@interface NSException : NSObject <NSCopying, NSSecureCoding> {
     NSExceptionName _name;
     NSString *_reason;
     NSDictionary *_userInfo;

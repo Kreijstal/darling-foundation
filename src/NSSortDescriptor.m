@@ -10,6 +10,9 @@
 #import <Foundation/NSException.h>
 #import <Foundation/NSKeyValueCoding.h>
 #import <Foundation/NSSet.h>
+#import <Foundation/NSKeyedArchiver.h>
+#import <Foundation/NSCoder.h>
+#import <Foundation/NSString.h>
 #import <objc/runtime.h>
 #import <stdlib.h>
 
@@ -90,11 +93,33 @@ enum {
     return self;
 }
 
++ (BOOL)supportsSecureCoding
+{
+    return YES;
+}
+
 - (id)initWithCoder:(NSCoder *)aDecoder
 {
-#warning TODO https://code.google.com/p/apportable/issues/detail?id=254
-    [self release];
-    return nil;
+    if (![aDecoder allowsKeyedCoding])
+    {
+        // Sequence read by the older non-keyed archives (as found in old
+        // nibs holding array controllers): the key, the ascending flag, then
+        // the selector name. It does not depend on the class version.
+        NSString *nonKeyedKey = [[aDecoder decodeObject] retain];
+        char nonKeyedAscending = 0;
+        [aDecoder decodeValuesOfObjCTypes:"c", &nonKeyedAscending];
+        NSString *nonKeyedSelectorName = [aDecoder decodeObject];
+        SEL nonKeyedSelector = [nonKeyedSelectorName isKindOfClass:[NSString class]] ? NSSelectorFromString(nonKeyedSelectorName) : NULL;
+        self = [self initWithKey:nonKeyedKey ascending:nonKeyedAscending != 0 selector:nonKeyedSelector];
+        [nonKeyedKey release];
+        return self;
+    }
+    NSString *key = [aDecoder decodeObjectOfClass:[NSString class] forKey:@"NSKey"];
+    NSString *selectorName = [aDecoder decodeObjectOfClass:[NSString class] forKey:@"NSSelector"];
+    BOOL ascending = [aDecoder decodeBoolForKey:@"NSAscending"];
+    // No selector name decodes as NULL, which initWithKey:ascending:selector: turns into compare:.
+    SEL selector = selectorName != nil ? NSSelectorFromString(selectorName) : NULL;
+    return [self initWithKey:key ascending:ascending selector:selector];
 }
 
 - (void)dealloc
@@ -109,7 +134,18 @@ enum {
 
 - (void)encodeWithCoder:(NSCoder *)aCoder
 {
-#warning TODO https://code.google.com/p/apportable/issues/detail?id=254
+    if ((_sortDescriptorFlags & NSSortDescriptorComparator) != 0)
+    {
+        [NSException raise:NSInvalidArchiveOperationException format:@"NSSortDescriptor using Blocks cannot be encoded."];
+    }
+    if (![aCoder allowsKeyedCoding])
+    {
+        [NSException raise:NSInvalidArchiveOperationException format:@"NSSortDescriptor can only be encoded by a keyed archiver."];
+    }
+    [aCoder encodeObject:_key forKey:@"NSKey"];
+    [aCoder encodeBool:(_sortDescriptorFlags & NSSortDescriptorAscending) != 0 forKey:@"NSAscending"];
+    [aCoder encodeObject:NSStringFromSelector(_selector) forKey:@"NSSelector"];
+    [aCoder encodeBool:NO forKey:@"NSReverseNullOrder"];
 }
 
 - (id)copyWithZone:(NSZone *)zone

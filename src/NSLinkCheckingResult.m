@@ -8,6 +8,9 @@
 #import "NSLinkCheckingResult.h"
 #import <Foundation/NSURL.h>
 
+#import "NSTextCheckingResultCoding.h"
+#import <Foundation/NSCoder.h>
+
 @implementation NSLinkCheckingResult
 
 - (id)initWithRange:(NSRange)range URL:(NSURL *)url
@@ -40,6 +43,34 @@
 - (NSTextCheckingType)resultType
 {
     return NSTextCheckingTypeLink;
+}
+
+
+- (void)encodeWithCoder:(NSCoder *)coder
+{
+    NSTextCheckingResultEncodeRange(coder, _range);
+    [coder encodeObject:_url forKey:@"NSURL"];
+}
+
+- (id)initWithCoder:(NSCoder *)coder
+{
+    NSRange range;
+    id stored = [coder decodeObjectOfClasses:NSTextCheckingResultLenientClasses([NSURL class]) forKey:@"NSURL"];
+    NSURL *url = nil;
+    if ([stored isKindOfClass:[NSURL class]])
+    {
+        url = stored;
+    }
+    else if ([stored isKindOfClass:[NSString class]])
+    {
+        url = [NSURL URLWithString:stored];
+    }
+    if (!NSTextCheckingResultDecodeRange(coder, &range) || stored == nil)
+    {
+        [self release];
+        return nil;
+    }
+    return [self initWithRange:range URL:url];
 }
 
 @end

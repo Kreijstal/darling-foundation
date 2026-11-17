@@ -390,17 +390,6 @@ static void __NSBundleMainBundleDealloc()
     return [(NSURL *)CFBundleCopyResourceURL(_cfBundle, (CFStringRef)name, (CFStringRef)ext, (CFStringRef)subpath) autorelease];
 }
 
-// Private AppKit spelling used to fetch an image from a bundle's Resources.
-- (NSURL *)URLForImageResource:(NSString *)name
-{
-    NSURL *url = [self URLForResource: name withExtension: nil];
-    if (url == nil)
-        url = [self URLForResource: name withExtension: @"png"];
-    if (url == nil)
-        url = [self URLForResource: name withExtension: @"tiff"];
-    return url;
-}
-
 - (NSURL *)URLForResource:(NSString *)name withExtension:(NSString *)ext subdirectory:(NSString *)subpath localization:(NSString *)localizationName
 {
     return [(NSURL *)CFBundleCopyResourceURLForLocalization(_cfBundle, (CFStringRef)name, (CFStringRef)ext, (CFStringRef)subpath, (CFStringRef)localizationName) autorelease];
@@ -707,9 +696,12 @@ static void __NSBundleMainBundleDealloc()
     if ([tableName length] == 0)
         tableName = @"Localizable";
 
-    CFDictionaryRef table = _CFBundleCopyStringTableForLocalization(_cfBundle, (CFStringRef)tableName, (CFStringRef)localizationName);
-    if (table == NULL && localizationName != nil)
-        table = _CFBundleCopyStringTableForLocalization(_cfBundle, (CFStringRef)tableName, NULL);
+    // QUIRK: a table or localization the bundle lacks yields an empty dictionary: neither nil nor
+    // a fallback to the search-list localization. Not documented; the method is private API.
+    // Evidence: black-box observation on macOS 27, arm64 (tier 2),
+    // vd-upstream/mac-probes/nsbundle-strings-for-table.m.
+    // Test: tests/nsbundle-localized-strings-for-table.m (missing localization, absent table).
+    CFDictionaryRef table = CFBundleCopyLocalizedStringTableForLocalization(_cfBundle, (CFStringRef)tableName, (CFStringRef)localizationName);
     return [(NSDictionary *)table autorelease];
 }
 

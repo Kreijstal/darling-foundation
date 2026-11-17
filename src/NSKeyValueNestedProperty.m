@@ -66,20 +66,7 @@
         lastImplicitRemovalInfo->keyPath = self.keyPathFromRelatedObject;
         lastImplicitRemovalInfo->originalObservable = object;
         lastImplicitRemovalInfo->isRecursing = YES;
-        if ([nextObject conformsToProtocol:@protocol(NSFastEnumeration)])
-        {
-            for (id member in (id <NSFastEnumeration>) nextObject)
-            {
-                if ([member isKindOfClass: [NSObject class]])
-                {
-                    [member removeObserver:observance forKeyPath:self.keyPathFromRelatedObject];
-                }
-            }
-        }
-        else
-        {
-            [nextObject removeObserver:observance forKeyPath:self.keyPathFromRelatedObject];
-        }
+        [nextObject removeObserver:observance forKeyPath:self.keyPathFromRelatedObject];
         *lastImplicitRemovalInfo = saved;
 
         NSKeyValueImplicitObservanceAdditionInfo *additionInfoPtr = _NSKeyValueGetImplicitObservanceAdditionInfo();
@@ -190,23 +177,7 @@
         additionInfoPtr->observance = observance;
 
         NSObject *nextObject = [object valueForKey:self.relationshipKey];
-        if ([nextObject conformsToProtocol:@protocol(NSFastEnumeration)])
-        {
-            // A nested key path that crosses a collection (selection.encodingController.
-            // enabledEncodings.localizedName) must observe the members, not the
-            // collection: -[NSArray addObserver:forKeyPath:...] always raises.
-            for (id member in (id <NSFastEnumeration>) nextObject)
-            {
-                if ([member isKindOfClass: [NSObject class]])
-                {
-                    [member addObserver:observance forKeyPath:self.keyPathFromRelatedObject options:newOptions context:newContext];
-                }
-            }
-        }
-        else
-        {
-            [nextObject addObserver:observance forKeyPath:self.keyPathFromRelatedObject options:newOptions context:newContext];
-        }
+        [nextObject addObserver:observance forKeyPath:self.keyPathFromRelatedObject options:newOptions context:newContext];
         *additionInfoPtr = saved;
     }
     [self.relationshipProperty object:object didAddObservance:observance recurse:shouldRecurse];

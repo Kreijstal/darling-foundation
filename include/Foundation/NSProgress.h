@@ -10,17 +10,19 @@ typedef NSString * NSProgressKind NS_TYPED_EXTENSIBLE_ENUM;
 typedef NSString * NSProgressUserInfoKey NS_TYPED_EXTENSIBLE_ENUM;
 typedef NSString * NSProgressFileOperationKind NS_TYPED_EXTENSIBLE_ENUM;
 
+NS_ASSUME_NONNULL_BEGIN
+
+// Instance state of NSProgress; the layout is private. The variables live in the interface because
+// 32-bit builds use the legacy runtime, which does not allow instance variables in an implementation.
 typedef struct {
     int64_t completed;
     int64_t total;
     BOOL overflowed;
 } NSProgressFraction;
 
-NS_ASSUME_NONNULL_BEGIN
-
 @interface NSProgress : NSObject {
-@protected
-    NSProgress *_parent;
+@private
+    NSProgress *_parent; // weak, accessed with objc_loadWeak/objc_storeWeak
     NSMutableSet *_children;
     NSProgressFraction _selfFraction;
     NSProgressFraction _childFraction;
@@ -47,6 +49,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)becomeCurrentWithPendingUnitCount:(int64_t)unitCount;
 - (void)resignCurrent;
+- (void)performAsCurrentWithPendingUnitCount:(int64_t)unitCount usingBlock:(void (NS_NOESCAPE ^)(void))work NS_REFINED_FOR_SWIFT;
 - (void)addChild:(NSProgress *)child withPendingUnitCount:(int64_t)inUnitCount;
 
 @property int64_t totalUnitCount;
@@ -76,8 +79,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (readonly, copy) NSDictionary<NSProgressUserInfoKey, id> *userInfo;
 @property (nullable, copy) NSProgressKind kind;
-@property (nullable, copy) NSNumber *estimatedTimeRemaining;
-@property (nullable, copy) NSNumber *throughput;
+@property (nullable, copy) NSNumber *estimatedTimeRemaining NS_REFINED_FOR_SWIFT;
+@property (nullable, copy) NSNumber *throughput NS_REFINED_FOR_SWIFT;
+@property (nullable, copy) NSNumber *fileTotalCount NS_REFINED_FOR_SWIFT;
+@property (nullable, copy) NSNumber *fileCompletedCount NS_REFINED_FOR_SWIFT;
 
 @end
 

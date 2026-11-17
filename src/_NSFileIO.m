@@ -15,6 +15,7 @@
 #import <Foundation/NSMutableDictionary.h>
 #import <fcntl.h>
 #import <errno.h>
+#import <string.h>
 #import <unistd.h>
 #import <libkern/OSAtomic.h>
 #import <stdio.h>
@@ -27,7 +28,6 @@ static NSError *NSFileReadError(int errorCode, NSString *path)
     NSInteger code = NSFileReadUnknownError;
     switch (errorCode) {
         case ENOENT:
-        case ENOTDIR:
             code = NSFileReadNoSuchFileError;
             break;
         case EACCES:

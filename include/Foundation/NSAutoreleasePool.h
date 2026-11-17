@@ -1,5 +1,6 @@
 #import <Foundation/NSObject.h>
 
+NS_AUTOMATED_REFCOUNT_UNAVAILABLE
 @interface NSAutoreleasePool : NSObject
 {
     void *context;

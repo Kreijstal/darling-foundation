@@ -1,7 +1,14 @@
 #import <Foundation/NSMeasurementFormatter.h>
 #import <Foundation/NSLocale.h>
 #import <Foundation/NSNumberFormatter.h>
-#import "NSUnitFormatterInternal.h"
+
+// A number formatter in decimal style, which is what a measurement formatter starts with.
+static NSNumberFormatter *newDefaultNumberFormatter(void)
+{
+    NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
+    [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
+    return formatter;
+}
 
 @implementation NSMeasurementFormatter
 
@@ -12,7 +19,7 @@
     {
         _unitStyle = NSFormattingUnitStyleMedium;
         _locale = [[NSLocale currentLocale] copy];
-        _numberFormatter = _NSUnitFormatterNewNumberFormatter();
+        _numberFormatter = newDefaultNumberFormatter();
     }
     return self;
 }
@@ -44,7 +51,7 @@
 - (void)setNumberFormatter:(NSNumberFormatter *)numberFormatter
 {
     NSNumberFormatter *old = _numberFormatter;
-    _numberFormatter = numberFormatter != nil ? [numberFormatter copy] : _NSUnitFormatterNewNumberFormatter();
+    _numberFormatter = numberFormatter != nil ? [numberFormatter copy] : newDefaultNumberFormatter();
     [old release];
 }
 

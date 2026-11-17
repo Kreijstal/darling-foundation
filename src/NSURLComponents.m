@@ -3,7 +3,6 @@
 #import <Foundation/NSDictionary.h>
 #import <Foundation/NSNull.h>
 #import <Foundation/NSException.h>
-#import <Foundation/NSValue.h>
 #import <CoreFoundation/CFURLComponents.h>
 
 @implementation NSURLComponents
@@ -35,7 +34,16 @@
 
 - (instancetype)initWithURL:(NSURL *)url resolvingAgainstBaseURL:(BOOL)resolve
 {
-    return [self initWithString:resolve ? [url absoluteString] : [url relativeString]];
+    if (url == nil) {
+        [self release];
+        [NSException raise:NSInvalidArgumentException format:@"*** -[NSURLComponents initWithURL:resolvingAgainstBaseURL:]: nil URL parameter"];
+    }
+    self = [super init];
+    if (self) {
+        _components = _CFURLComponentsCreateWithURL(kCFAllocatorDefault, (CFURLRef)url, resolve);
+        if (!_components) { [self release]; return nil; }
+    }
+    return self;
 }
 
 + (instancetype)componentsWithURL:(NSURL *)url resolvingAgainstBaseURL:(BOOL)resolve
@@ -48,10 +56,32 @@
     return [(NSString *)_CFURLComponentsCopyScheme(_components) autorelease];
 }
 
-- (void)setScheme:(NSString *)scheme
+- (void)setScheme:(NSString *)value
 {
-    if (!_CFURLComponentsSetScheme(_components, (CFStringRef)scheme))
-        [NSException raise:NSInvalidArgumentException format:@"invalid URL scheme"];
+    if (!_CFURLComponentsSetScheme(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for scheme"];
+}
+
+- (NSString *)user
+{
+    return [(NSString *)_CFURLComponentsCopyUser(_components) autorelease];
+}
+
+- (void)setUser:(NSString *)value
+{
+    if (!_CFURLComponentsSetUser(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for user"];
+}
+
+- (NSString *)password
+{
+    return [(NSString *)_CFURLComponentsCopyPassword(_components) autorelease];
+}
+
+- (void)setPassword:(NSString *)value
+{
+    if (!_CFURLComponentsSetPassword(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for password"];
 }
 
 - (NSString *)host
@@ -59,10 +89,130 @@
     return [(NSString *)_CFURLComponentsCopyHost(_components) autorelease];
 }
 
-- (void)setHost:(NSString *)host
+- (void)setHost:(NSString *)value
 {
-    if (!_CFURLComponentsSetHost(_components, (CFStringRef)host))
-        [NSException raise:NSInvalidArgumentException format:@"invalid URL host"];
+    if (!_CFURLComponentsSetHost(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for host"];
+}
+
+- (NSString *)path
+{
+    return [(NSString *)_CFURLComponentsCopyPath(_components) autorelease] ?: @"";
+}
+
+- (void)setPath:(NSString *)value
+{
+    if (!_CFURLComponentsSetPath(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for path"];
+}
+
+- (NSString *)query
+{
+    return [(NSString *)_CFURLComponentsCopyQuery(_components) autorelease];
+}
+
+- (void)setQuery:(NSString *)value
+{
+    if (!_CFURLComponentsSetQuery(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for query"];
+}
+
+- (NSString *)fragment
+{
+    return [(NSString *)_CFURLComponentsCopyFragment(_components) autorelease];
+}
+
+- (void)setFragment:(NSString *)value
+{
+    if (!_CFURLComponentsSetFragment(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for fragment"];
+}
+
+- (NSString *)percentEncodedUser
+{
+    return [(NSString *)_CFURLComponentsCopyPercentEncodedUser(_components) autorelease];
+}
+
+- (void)setPercentEncodedUser:(NSString *)value
+{
+    if (!_CFURLComponentsSetPercentEncodedUser(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for percentEncodedUser"];
+}
+
+- (NSString *)percentEncodedPassword
+{
+    return [(NSString *)_CFURLComponentsCopyPercentEncodedPassword(_components) autorelease];
+}
+
+- (void)setPercentEncodedPassword:(NSString *)value
+{
+    if (!_CFURLComponentsSetPercentEncodedPassword(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for percentEncodedPassword"];
+}
+
+- (NSString *)percentEncodedHost
+{
+    return [(NSString *)_CFURLComponentsCopyPercentEncodedHost(_components) autorelease];
+}
+
+- (void)setPercentEncodedHost:(NSString *)value
+{
+    if (!_CFURLComponentsSetPercentEncodedHost(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for percentEncodedHost"];
+}
+
+- (NSString *)encodedHost
+{
+    return [self percentEncodedHost];
+}
+
+- (void)setEncodedHost:(NSString *)host
+{
+    [self setPercentEncodedHost:host];
+}
+
+- (NSString *)percentEncodedPath
+{
+    return [(NSString *)_CFURLComponentsCopyPercentEncodedPath(_components) autorelease] ?: @"";
+}
+
+- (void)setPercentEncodedPath:(NSString *)value
+{
+    if (!_CFURLComponentsSetPercentEncodedPath(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for percentEncodedPath"];
+}
+
+- (NSString *)percentEncodedQuery
+{
+    return [(NSString *)_CFURLComponentsCopyPercentEncodedQuery(_components) autorelease];
+}
+
+- (void)setPercentEncodedQuery:(NSString *)value
+{
+    if (!_CFURLComponentsSetPercentEncodedQuery(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for percentEncodedQuery"];
+}
+
+- (NSString *)percentEncodedFragment
+{
+    return [(NSString *)_CFURLComponentsCopyPercentEncodedFragment(_components) autorelease];
+}
+
+- (void)setPercentEncodedFragment:(NSString *)value
+{
+    if (!_CFURLComponentsSetPercentEncodedFragment(_components, (CFStringRef)value))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL component for percentEncodedFragment"];
+}
+
+- (NSNumber *)port
+{
+    return [(NSNumber *)_CFURLComponentsCopyPort(_components) autorelease];
+}
+
+- (void)setPort:(NSNumber *)port
+{
+    if (!_CFURLComponentsSetPort(_components, (CFNumberRef)port))
+        [NSException raise:NSInvalidArgumentException format:@"invalid URL port"];
 }
 
 - (NSURL *)URL
@@ -80,96 +230,52 @@
     return [(NSString *)_CFURLComponentsCopyString(_components) autorelease];
 }
 
-/* Each component as given (percent-encoded on the way in and decoded on the way out), and as it
-   appears in the URL; setting an invalid percent-encoded value raises, as in Apple's Foundation. */
-#define NSURLCOMPONENT(getter, setter, Name) \
-- (NSString *)getter { return [(NSString *)_CFURLComponentsCopy##Name(_components) autorelease]; } \
-- (void)setter:(NSString *)value { _CFURLComponentsSet##Name(_components, (CFStringRef)value); } \
-- (NSString *)percentEncoded##Name { return [(NSString *)_CFURLComponentsCopyPercentEncoded##Name(_components) autorelease]; } \
-- (void)setPercentEncoded##Name:(NSString *)value \
-{ \
-    if (!_CFURLComponentsSetPercentEncoded##Name(_components, (CFStringRef)value)) \
-        [NSException raise:NSInvalidArgumentException format:@"invalid characters in percentEncoded" #Name]; \
+// A component that is not part of the string has no range, reported as NSNotFound.
+static NSRange rangeFromCF(CFRange range)
+{
+    if (range.location == kCFNotFound)
+        return NSMakeRange(NSNotFound, 0);
+    return NSMakeRange((NSUInteger)range.location, (NSUInteger)range.length);
 }
 
-NSURLCOMPONENT(user, setUser, User)
-NSURLCOMPONENT(password, setPassword, Password)
-NSURLCOMPONENT(path, setPath, Path)
-NSURLCOMPONENT(query, setQuery, Query)
-NSURLCOMPONENT(fragment, setFragment, Fragment)
-
-- (NSString *)percentEncodedHost
+- (NSRange)rangeOfScheme
 {
-    return [(NSString *)_CFURLComponentsCopyPercentEncodedHost(_components) autorelease];
+    return rangeFromCF(_CFURLComponentsGetRangeOfScheme(_components));
 }
 
-- (void)setPercentEncodedHost:(NSString *)host
+- (NSRange)rangeOfUser
 {
-    if (!_CFURLComponentsSetPercentEncodedHost(_components, (CFStringRef)host))
-        [NSException raise:NSInvalidArgumentException format:@"invalid characters in percentEncodedHost"];
+    return rangeFromCF(_CFURLComponentsGetRangeOfUser(_components));
 }
 
-- (NSString *)encodedHost
+- (NSRange)rangeOfPassword
 {
-    return [self percentEncodedHost];
+    return rangeFromCF(_CFURLComponentsGetRangeOfPassword(_components));
 }
 
-- (void)setEncodedHost:(NSString *)host
+- (NSRange)rangeOfHost
 {
-    [self setPercentEncodedHost:host];
+    return rangeFromCF(_CFURLComponentsGetRangeOfHost(_components));
 }
 
-- (NSNumber *)port
+- (NSRange)rangeOfPort
 {
-    return [(NSNumber *)_CFURLComponentsCopyPort(_components) autorelease];
+    return rangeFromCF(_CFURLComponentsGetRangeOfPort(_components));
 }
 
-- (void)setPort:(NSNumber *)port
+- (NSRange)rangeOfPath
 {
-    if (!_CFURLComponentsSetPort(_components, (CFNumberRef)port))
-        [NSException raise:NSInvalidArgumentException format:@"invalid URL port"];
+    return rangeFromCF(_CFURLComponentsGetRangeOfPath(_components));
 }
 
-static NSRange NSRangeFromCFURLRange(CFRange range)
+- (NSRange)rangeOfQuery
 {
-    return range.location == kCFNotFound ? NSMakeRange(NSNotFound, 0) : NSMakeRange(range.location, range.length);
+    return rangeFromCF(_CFURLComponentsGetRangeOfQuery(_components));
 }
 
-- (NSRange)rangeOfScheme { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfScheme(_components)); }
-- (NSRange)rangeOfUser { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfUser(_components)); }
-- (NSRange)rangeOfPassword { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfPassword(_components)); }
-- (NSRange)rangeOfHost { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfHost(_components)); }
-- (NSRange)rangeOfPort { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfPort(_components)); }
-- (NSRange)rangeOfPath { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfPath(_components)); }
-- (NSRange)rangeOfQuery { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfQuery(_components)); }
-- (NSRange)rangeOfFragment { return NSRangeFromCFURLRange(_CFURLComponentsGetRangeOfFragment(_components)); }
-
-- (id)copyWithZone:(NSZone *)zone
+- (NSRange)rangeOfFragment
 {
-    NSURLComponents *copy = [[[self class] allocWithZone:zone] init];
-    if (copy) {
-        CFRelease(copy->_components);
-        copy->_components = _CFURLComponentsCreateCopy(kCFAllocatorDefault, _components);
-    }
-    return copy;
-}
-
-- (BOOL)isEqual:(id)other
-{
-    if (other == self) return YES;
-    if (![other isKindOfClass:[NSURLComponents class]]) return NO;
-    NSString *mine = [self string], *theirs = [other string];
-    return mine == theirs || [mine isEqual:theirs];
-}
-
-- (NSUInteger)hash
-{
-    return [[self string] hash];
-}
-
-- (NSString *)description
-{
-    return [NSString stringWithFormat:@"<%@ %p> %@", [self class], self, [self string]];
+    return rangeFromCF(_CFURLComponentsGetRangeOfFragment(_components));
 }
 
 - (NSArray *)queryItems
@@ -183,6 +289,21 @@ static NSRange NSRangeFromCFURLRange(CFRange range)
             value:[pair objectForKey:(NSString *)_kCFURLComponentsValueKey]] autorelease]];
     }
     return [[items copy] autorelease];
+}
+
+- (void)setQueryItems:(NSArray *)items
+{
+    if (!items) {
+        _CFURLComponentsSetPercentEncodedQuery(_components, NULL);
+        return;
+    }
+    NSMutableArray *names = [NSMutableArray arrayWithCapacity:[items count]];
+    NSMutableArray *values = [NSMutableArray arrayWithCapacity:[items count]];
+    for (NSURLQueryItem *item in items) {
+        [names addObject:[item name]];
+        [values addObject:[item value] ?: [NSNull null]];
+    }
+    _CFURLComponentsSetQueryItems(_components, (CFArrayRef)names, (CFArrayRef)values);
 }
 
 - (NSArray *)percentEncodedQueryItems
@@ -211,22 +332,30 @@ static NSRange NSRangeFromCFURLRange(CFRange range)
         [values addObject:[item value] ?: [NSNull null]];
     }
     if (!_CFURLComponentsSetPercentEncodedQueryItems(_components, (CFArrayRef)names, (CFArrayRef)values))
-        [NSException raise:NSInvalidArgumentException format:@"invalid characters in percentEncodedQueryItems"];
+        [NSException raise:NSInvalidArgumentException format:@"invalid percent-encoded query item"];
 }
 
-- (void)setQueryItems:(NSArray *)items
+- (id)copyWithZone:(NSZone *)zone
 {
-    if (!items) {
-        _CFURLComponentsSetPercentEncodedQuery(_components, NULL);
-        return;
+    NSURLComponents *copy = [[[self class] allocWithZone:zone] init];
+    if (copy) {
+        if (copy->_components) CFRelease(copy->_components);
+        copy->_components = _CFURLComponentsCreateCopy(kCFAllocatorDefault, _components);
     }
-    NSMutableArray *names = [NSMutableArray arrayWithCapacity:[items count]];
-    NSMutableArray *values = [NSMutableArray arrayWithCapacity:[items count]];
-    for (NSURLQueryItem *item in items) {
-        [names addObject:[item name]];
-        [values addObject:[item value] ?: [NSNull null]];
-    }
-    _CFURLComponentsSetQueryItems(_components, (CFArrayRef)names, (CFArrayRef)values);
+    return copy;
+}
+
+- (BOOL)isEqual:(id)other
+{
+    if (self == other) return YES;
+    if (![other isKindOfClass:[NSURLComponents class]]) return NO;
+    NSString *a = [self string], *b = [other string];
+    return a == b || [a isEqual:b];
+}
+
+- (NSUInteger)hash
+{
+    return [[self string] hash];
 }
 
 - (void)dealloc
